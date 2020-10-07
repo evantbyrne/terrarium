@@ -1,6 +1,6 @@
 # Terrarium
 
-Mutexed state management for CI and other ephemeral filesystems.
+Mutexed file sync backed by S3. Designed for painless state management in CI or other ephemeral filesystems.
 
 ## Usage
 
