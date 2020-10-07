@@ -67,7 +67,8 @@ func main() {
 	}
 
 	var commands = map[string]src.Command{
-		"lock": &src.CommandLock{},
+		"commit": &src.CommandCommit{},
+		"lock":   &src.CommandLock{},
 	}
 	commands["help"] = &src.CommandHelp{
 		Commands: commands,
