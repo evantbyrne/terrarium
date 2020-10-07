@@ -20,6 +20,7 @@ func usage() {
 	fmt.Println("  download        Download remote state without locking")
 	fmt.Println("  help            Prints helpful information about other commands")
 	fmt.Println("  lock            Download and lock remote state")
+	fmt.Println("  unlock          Unlock remote state")
 	fmt.Println("  version         Prints the terrarium version")
 }
 
@@ -69,6 +70,7 @@ func main() {
 	var commands = map[string]src.Command{
 		"commit": &src.CommandCommit{},
 		"lock":   &src.CommandLock{},
+		"unlock": &src.CommandUnlock{},
 	}
 	commands["help"] = &src.CommandHelp{
 		Commands: commands,
