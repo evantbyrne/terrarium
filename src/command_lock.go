@@ -21,7 +21,7 @@ import (
 type CommandLock struct{}
 
 func (this *CommandLock) Help() string {
-	return "Usage: terrarium [-expires] [-s3-bucket] [-s3-region] lock <directory>"
+	return "Usage: terrarium [-expires] [-retry-wait] [-s3-bucket] [-s3-region] [-timeout] lock <directory>"
 }
 
 func (this *CommandLock) Run(config *Config, args []string) error {
@@ -32,6 +32,7 @@ func (this *CommandLock) Run(config *Config, args []string) error {
 	config.Directory = strings.Trim(args[1], "/") + "/"
 	lockPath := config.Directory + ".lock"
 	statePath := config.Directory + "state/"
+	timeoutExpires := time.Now().Add(time.Duration(int64(time.Second) * int64(config.Timeout))).Unix()
 
 	sess, err := session.NewSession(&aws.Config{
 		Credentials: credentials.NewEnvCredentials(),
@@ -40,34 +41,29 @@ func (this *CommandLock) Run(config *Config, args []string) error {
 		return err
 	}
 
-	// Check the lock.
-	var expires int64 = 0
-	fw := aws.NewWriteAtBuffer([]byte{})
-	downloader := s3manager.NewDownloader(sess)
-	_, err = downloader.Download(fw,
-		&s3.GetObjectInput{
-			Bucket: aws.String(config.S3Bucket),
-			Key:    aws.String(lockPath),
-		})
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != s3.ErrCodeNoSuchKey {
+	// Wait for remote state to unlock.
+	unlocked := false
+	for !unlocked {
+		unlocked, err = CheckS3Unlocked(config, lockPath, sess)
+		if err != nil {
+			fmt.Println("S3 error.")
 			return err
 		}
-	} else {
-		if expiresParsed, err := strconv.ParseInt(string(fw.Bytes()), 10, 64); err == nil {
-			expires = expiresParsed
-		}
-	}
 
-	now := time.Now()
-	if expires > now.Unix() {
-		fmt.Printf("Cannot unlock: %d\n", expires)
-		fmt.Printf("Access time: %d\n", now.Unix())
-		return nil
+		if !unlocked {
+			if config.Timeout == 0 {
+				return errors.New("Could not unlock remote state.")
+			}
+			if time.Now().Unix() > timeoutExpires {
+				return errors.New("Timeout exceeded for unlocking remote state.")
+			}
+
+			time.Sleep(time.Duration(int64(time.Second) * int64(config.RetriesWait)))
+		}
 	}
 
 	// Upload the lock.
-	lockExpires := now.Add(time.Duration(int64(time.Second) * int64(config.Expires))).Unix()
+	lockExpires := time.Now().Add(time.Duration(int64(time.Second) * int64(config.Expires))).Unix()
 	fr := bytes.NewReader([]byte(strconv.FormatInt(lockExpires, 10)))
 	uploader := s3manager.NewUploader(sess)
 	_, err = uploader.Upload(&s3manager.UploadInput{
@@ -119,4 +115,34 @@ func (this *CommandLock) Run(config *Config, args []string) error {
 	}
 
 	return nil
+}
+
+func CheckS3Unlocked(config *Config, lockPath string, sess *session.Session) (bool, error) {
+	fw := aws.NewWriteAtBuffer([]byte{})
+	downloader := s3manager.NewDownloader(sess)
+	_, err := downloader.Download(fw,
+		&s3.GetObjectInput{
+			Bucket: aws.String(config.S3Bucket),
+			Key:    aws.String(lockPath),
+		})
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == s3.ErrCodeNoSuchKey {
+			// Lock file does not exist.
+			return true, nil
+		} else {
+			// Some other S3 error.
+			return false, err
+		}
+	}
+
+	expires, err := strconv.ParseInt(string(fw.Bytes()), 10, 64)
+	if err != nil {
+		return false, err
+	}
+
+	if expires <= time.Now().Unix() {
+		return true, nil
+	}
+
+	return false, nil
 }

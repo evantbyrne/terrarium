@@ -31,8 +31,10 @@ func exitErrorf(msg string, args ...interface{}) {
 
 func main() {
 	expires := flag.Uint64("expires", 600, "Maximum time in seconds lock the remote state.")
+	retriesWait := flag.Uint64("retries-wait", 1, "Time in seconds to wait between retries for checking if the remote state is unlocked.")
 	s3Bucket := flag.String("s3-bucket", "", "S3 bucket.")
 	s3Region := flag.String("s3-region", "", "S3 region.")
+	timeout := flag.Uint64("timeout", 0, "Maximum amount of time in seconds to wait for remote state to unlock.")
 
 	flag.Usage = usage
 	flag.Parse()
@@ -45,6 +47,10 @@ func main() {
 	config := &src.Config{}
 	if commandSlug != "help" {
 		if err := config.SetExpires(*expires); err != nil {
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
+		if err := config.SetRetriesWait(*retriesWait); err != nil {
 			fmt.Println("Error:", err)
 			os.Exit(1)
 		}
@@ -61,6 +67,10 @@ func main() {
 			os.Exit(1)
 		}
 		if err := config.SetS3SecretKey(os.Getenv("AWS_SECRET_KEY")); err != nil {
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
+		if err := config.SetTimeout(*timeout); err != nil {
 			fmt.Println("Error:", err)
 			os.Exit(1)
 		}
