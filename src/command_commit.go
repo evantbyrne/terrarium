@@ -66,20 +66,22 @@ func (this *CommandCommit) Run(config *Config, args []string) error {
 	}
 
 	// Delete old state.
-	deleteInput := &s3.DeleteObjectsInput{
-		Bucket: aws.String(config.S3Bucket),
-		Delete: &s3.Delete{
-			Objects: []*s3.ObjectIdentifier{},
-		},
-	}
-	for _, item := range resp.Contents {
-		deleteInput.Delete.Objects = append(deleteInput.Delete.Objects, &s3.ObjectIdentifier{
-			Key: aws.String(*item.Key),
-		})
-	}
-	_, err = svc.DeleteObjects(deleteInput)
-	if err != nil {
-		return err
+	if len(resp.Contents) > 0 {
+		deleteInput := &s3.DeleteObjectsInput{
+			Bucket: aws.String(config.S3Bucket),
+			Delete: &s3.Delete{
+				Objects: []*s3.ObjectIdentifier{},
+			},
+		}
+		for _, item := range resp.Contents {
+			deleteInput.Delete.Objects = append(deleteInput.Delete.Objects, &s3.ObjectIdentifier{
+				Key: aws.String(*item.Key),
+			})
+		}
+		_, err = svc.DeleteObjects(deleteInput)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Upload new state.
