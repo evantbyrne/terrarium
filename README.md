@@ -13,7 +13,7 @@ export AWS_SECRET_KEY="..."
 
 # Lock and download the 'terraform-nginx' directory in the 'us-east-1'
 # region bucket'my-bucket' S3 for a maximum of 10 minutes.
-terrarium -expires=10m \
+terrarium -expires=600 \
   -s3-bucket=my-bucket \
   -s3-region=us-east-1 \
   lock terraform-nginx
