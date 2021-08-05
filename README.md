@@ -28,3 +28,11 @@ terrarium -s3-bucket=my-bucket \
   -s3-region=us-east-1 \
   commit terraform-nginx
 ```
+
+## Install
+
+Terrarium may be installed directly from the source repository on a system with Go 1.16 or higher, and may be done like so:
+
+```
+go install github.com/evantbyrne/terrarium@latest
+```
